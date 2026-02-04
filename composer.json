@@ -1,0 +1,45 @@
+{
+    "name": "daniel-km/omeka-assets",
+    "type": "composer-plugin",
+    "version": "1.0.0",
+    "description": "Composer plugin to download external assets for Omeka S modules and themes",
+    "license": "CECILL-2.1",
+    "keywords": ["omeka", "assets", "composer-plugin"],
+    "homepage": "https://github.com/omeka/omeka-assets",
+    "authors": [
+        {
+            "name": "Omeka Team",
+            "email": "info@omeka.org"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "composer-plugin-api": "^2.0"
+    },
+    "require-dev": {
+        "composer/composer": "^2.0",
+        "phpunit/phpunit": "^9.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Omeka\\OmekaAssets\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Omeka\\OmekaAssets\\Test\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/omeka-assets"
+    ],
+    "extra": {
+        "class": "Omeka\\OmekaAssets\\OmekaAssetsPlugin"
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
