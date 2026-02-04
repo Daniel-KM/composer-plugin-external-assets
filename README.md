@@ -154,12 +154,30 @@ How it works
 Requirements
 ------------
 
-| Requirement             | Version |
-|-------------------------|---------|
-| PHP                     | 8.1+    |
-| Composer                | 2.0+    |
-| `unzip` or `ZipArchive` | Any     |
-| `tar` or `PharData`     | Any     |
+| Requirement             | Version  |
+|-------------------------|----------|
+| PHP                     | 7.2.5+   |
+| Composer                | 2.0+     |
+| `unzip` or `ZipArchive` | Any      |
+| `tar` or `PharData`     | Any      |
+
+
+Development
+-----------
+
+### Running tests
+
+```sh
+# Unit tests only
+vendor/bin/phpunit --exclude-group integration
+
+# All tests (unit + integration)
+PROJECT_PATH=/path/to/project vendor/bin/phpunit
+```
+
+The `PROJECT_PATH` environment variable should point to any valid directory (e.g.,
+the project where the plugin is installed). Integration tests use this path to
+verify the plugin can be loaded in a real environment.
 
 
 Warning
