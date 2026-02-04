@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace DanielKm\ExternalAssets;
+namespace Sempia\ExternalAssets;
 
 use Composer\Composer;
 use Composer\EventDispatcher\EventSubscriberInterface;

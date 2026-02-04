@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace DanielKm\ExternalAssets\Test;
+namespace Sempia\ExternalAssets\Test;
 
 use PHPUnit\Framework\TestCase;
 

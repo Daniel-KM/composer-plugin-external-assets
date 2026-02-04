@@ -1,9 +1,6 @@
 External Assets (Composer plugin)
 =================================
 
-> __New versions of this plugin are available on [GitLab], which seems to respect
-> users and privacy better than the previous repository.__
-
 [External Assets] is a Composer plugin that allows to download external assets
 (JS, CSS, fonts, images, etc.) for any PHP project.
 
@@ -31,7 +28,7 @@ Add to your package `composer.json`:
 ```json
 {
     "require": {
-        "daniel-km/external-assets": "^1.0"
+        "sempia/external-assets": "^1.0"
     }
 }
 ```
@@ -83,7 +80,7 @@ Rules:
     "name": "your-vendor/your-package",
     "type": "library",
     "require": {
-        "daniel-km/external-assets": "^1.0"
+        "sempia/external-assets": "^1.0"
     },
     "autoload": {
         "psr-4": {
@@ -196,7 +193,7 @@ See online issues on the [plugin issues] page on GitLab.
 
 ### Assets not downloading
 
-- Ensure your package requires `daniel-km/external-assets`
+- Ensure your package requires `sempia/external-assets`
 - Verify URLs are accessible: `curl -I https://your-url.com/file.js`
 - Check that the package directory is writeable
 
@@ -253,11 +250,11 @@ This plugin was originally designed for [Omeka S] modules for the [digital libra
 of the [Université des Antilles] (subvention Agence bibliographique de l’enseignement supérieur [Abes]).
 
 
-[External Assets]: https://gitlab.com/Daniel-KM/Omeka-Composer-plugin-external-assets
+[External Assets]: https://gitlab.com/sempia/composer-plugin-external-assets
 [Omeka S]: https://omeka.org/s
 [civicrm/composer-downloads-plugin]: https://github.com/civicrm/composer-downloads-plugin
 [lastcall/composer-extra-files]: https://packagist.org/packages/lastcall/composer-extra-files
-[plugin issues]: https://gitlab.com/Daniel-KM/Omeka-Composer-plugin-external-assets/-/issues
+[plugin issues]: https://gitlab.com/sempia/composer-plugin-external-assets/-/issues
 [CeCILL v2.1]: https://www.cecill.info/licences/Licence_CeCILL_V2.1-en.html
 [GNU/GPL]: https://www.gnu.org/licenses/gpl-3.0.html
 [FSF]: https://www.fsf.org
@@ -265,5 +262,5 @@ of the [Université des Antilles] (subvention Agence bibliographique de l’ense
 [digital library Manioc]: https://manioc.org
 [Université des Antilles]: https://www.univ-antilles.fr
 [Abes]: https://abes.fr
-[GitLab]: https://gitlab.com/Daniel-KM
+[GitLab]: https://gitlab.com/sempia/composer-plugin-external-assets
 [Daniel-KM]: https://gitlab.com/Daniel-KM "Daniel Berthereau"

@@ -24,7 +24,7 @@
 
 declare(strict_types=1);
 
-namespace DanielKm\ExternalAssets;
+namespace Sempia\ExternalAssets;
 
 // Handle autoload - try different locations for standalone usage
 $autoloadPaths = [

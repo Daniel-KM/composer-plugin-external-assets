@@ -1,11 +1,11 @@
 {
-    "name": "daniel-km/external-assets",
+    "name": "sempia/external-assets",
     "type": "composer-plugin",
     "version": "1.0.0",
     "description": "Composer plugin to download external assets (JS, CSS, fonts, images) for any PHP project",
     "license": "CECILL-2.1",
     "keywords": ["assets", "composer-plugin", "download", "external"],
-    "homepage": "https://gitlab.com/Daniel-KM/composer-plugin-external-assets",
+    "homepage": "https://gitlab.com/sempia/composer-plugin-external-assets",
     "authors": [
         {
             "name": "Daniel Berthereau",
@@ -22,19 +22,19 @@
     },
     "autoload": {
         "psr-4": {
-            "DanielKm\\ExternalAssets\\": "src/"
+            "Sempia\\ExternalAssets\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "DanielKm\\ExternalAssets\\Test\\": "tests/"
+            "Sempia\\ExternalAssets\\Test\\": "tests/"
         }
     },
     "bin": [
         "bin/external-assets"
     ],
     "extra": {
-        "class": "DanielKm\\ExternalAssets\\ExternalAssetsPlugin"
+        "class": "Sempia\\ExternalAssets\\ExternalAssetsPlugin"
     },
     "scripts": {
         "test": "phpunit"

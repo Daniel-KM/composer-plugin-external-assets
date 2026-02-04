@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace DanielKm\ExternalAssets\Test;
+namespace Sempia\ExternalAssets\Test;
 
 use Composer\Composer;
 use Composer\Config;
 use Composer\Installer\InstallationManager;
 use Composer\IO\IOInterface;
 use Composer\Package\PackageInterface;
-use DanielKm\ExternalAssets\ExternalAssetsPlugin;
+use Sempia\ExternalAssets\ExternalAssetsPlugin;
 use PHPUnit\Framework\TestCase;
 
 /**

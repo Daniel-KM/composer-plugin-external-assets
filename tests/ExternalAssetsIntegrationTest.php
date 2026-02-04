@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace DanielKm\ExternalAssets\Test;
+namespace Sempia\ExternalAssets\Test;
 
-use DanielKm\ExternalAssets\ExternalAssetsPlugin;
+use Sempia\ExternalAssets\ExternalAssetsPlugin;
 use PHPUnit\Framework\TestCase;
 
 /**
