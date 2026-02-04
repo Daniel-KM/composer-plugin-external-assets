@@ -1,15 +1,15 @@
 {
-    "name": "daniel-km/omeka-assets",
+    "name": "daniel-km/external-assets",
     "type": "composer-plugin",
     "version": "1.0.0",
-    "description": "Composer plugin to download external assets for Omeka S modules and themes",
+    "description": "Composer plugin to download external assets (JS, CSS, fonts, images) for any PHP project",
     "license": "CECILL-2.1",
-    "keywords": ["omeka", "assets", "composer-plugin"],
-    "homepage": "https://github.com/omeka/omeka-assets",
+    "keywords": ["assets", "composer-plugin", "download", "external"],
+    "homepage": "https://gitlab.com/Daniel-KM/composer-plugin-external-assets",
     "authors": [
         {
-            "name": "Omeka Team",
-            "email": "info@omeka.org"
+            "name": "Daniel Berthereau",
+            "email": "Daniel.fr@Berthereau.net"
         }
     ],
     "require": {
@@ -22,19 +22,19 @@
     },
     "autoload": {
         "psr-4": {
-            "Omeka\\OmekaAssets\\": "src/"
+            "DanielKm\\ExternalAssets\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Omeka\\OmekaAssets\\Test\\": "tests/"
+            "DanielKm\\ExternalAssets\\Test\\": "tests/"
         }
     },
     "bin": [
-        "bin/omeka-assets"
+        "bin/external-assets"
     ],
     "extra": {
-        "class": "Omeka\\OmekaAssets\\OmekaAssetsPlugin"
+        "class": "DanielKm\\ExternalAssets\\ExternalAssetsPlugin"
     },
     "scripts": {
         "test": "phpunit"

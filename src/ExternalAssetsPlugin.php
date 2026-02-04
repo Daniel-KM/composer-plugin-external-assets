@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Omeka\OmekaAssets;
+namespace DanielKm\ExternalAssets;
 
 use Composer\Composer;
 use Composer\EventDispatcher\EventSubscriberInterface;
@@ -15,14 +15,14 @@ use Composer\Util\HttpDownloader;
 use Composer\Util\ProcessExecutor;
 
 /**
- * Composer plugin to download external assets for Omeka S modules and themes.
+ * Composer plugin to download external assets for PHP projects.
  *
- * This plugin handles the "extra.omeka-assets" configuration in composer.json,
+ * This plugin handles the "extra.external-assets" configuration in composer.json,
  * downloading external files (JS, CSS, etc.) during package installation.
  *
  * Format:
  * "extra": {
- *     "omeka-assets": {
+ *     "external-assets": {
  *         "asset/vendor/lib/file.min.js": "https://example.com/v3.4.0/file.min.js",
  *         "asset/vendor/lib/": "https://example.com/v3.4.1/archive.zip",
  *         "asset/vendor/scripts/": "https://example.com/script.js"
@@ -34,7 +34,7 @@ use Composer\Util\ProcessExecutor;
  *   Note: if the archive contains a single root directory, it is stripped.
  * - If destination ends with `/` and url is a file, copy it into that directory.
  */
-class OmekaAssetsPlugin implements PluginInterface, EventSubscriberInterface
+class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
 {
     /** @var Composer */
     protected $composer;
@@ -65,36 +65,36 @@ class OmekaAssetsPlugin implements PluginInterface, EventSubscriberInterface
     }
 
     /**
-     * Handle post-install for packages with omeka-assets.
+     * Handle post-install for packages with external-assets.
      */
     public function onPostPackageInstall(PackageEvent $event)
     {
         $package = $event->getOperation()->getPackage();
-        $this->handleOmekaAssets($package);
+        $this->handleExternalAssets($package);
     }
 
     /**
-     * Handle post-update for packages with omeka-assets.
+     * Handle post-update for packages with external-assets.
      */
     public function onPostPackageUpdate(PackageEvent $event)
     {
         $package = $event->getOperation()->getTargetPackage();
-        $this->handleOmekaAssets($package);
+        $this->handleExternalAssets($package);
     }
 
     /**
-     * Download and install assets defined in extra.omeka-assets.
+     * Download and install assets defined in extra.external-assets.
      */
-    protected function handleOmekaAssets($package)
+    protected function handleExternalAssets($package)
     {
         $extra = $package->getExtra();
-        if (empty($extra['omeka-assets']) || !is_array($extra['omeka-assets'])) {
+        if (empty($extra['external-assets']) || !is_array($extra['external-assets'])) {
             return;
         }
 
         $installPath = $this->composer->getInstallationManager()->getInstallPath($package);
 
-        foreach ($extra['omeka-assets'] as $destination => $url) {
+        foreach ($extra['external-assets'] as $destination => $url) {
             $destPath = $installPath . '/' . ltrim($destination, '/');
             $isDirectory = substr($destination, -1) === '/';
             $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
@@ -147,7 +147,7 @@ class OmekaAssetsPlugin implements PluginInterface, EventSubscriberInterface
         $filesystem = new Filesystem();
 
         $tempFile = sys_get_temp_dir() . '/' . basename($url);
-        $tempDir = sys_get_temp_dir() . '/omeka_extract_' . uniqid();
+        $tempDir = sys_get_temp_dir() . '/external_extract_' . uniqid();
 
         $filesystem->ensureDirectoryExists($tempDir);
 

@@ -1,51 +1,54 @@
-Omeka Assets (Composer plugin)
-==============================
+External Assets (Composer plugin)
+=================================
 
-> __New versions of this plugin and support for Omeka S version 3.0 and above
-> are available on [GitLab], which seems to respect users and privacy better
-> than the previous repository.__
+> __New versions of this plugin are available on [GitLab], which seems to respect
+> users and privacy better than the previous repository.__
 
-[Omeka Assets] is a Composer plugin that allows to download external assets (JS,
-CSS, fonts, images, etc.) for [Omeka S] modules and themes.
+[External Assets] is a Composer plugin that allows to download external assets
+(JS, CSS, fonts, images, etc.) for any PHP project.
 
-Omeka S modules often need external JavaScript or CSS libraries (jQuery plugins,
+PHP projects often need external JavaScript or CSS libraries (jQuery plugins,
 Mirador, OpenSeadragon, Leaflet, etc.). These assets are typically hosted on
 CDNs or GitHub releases.
 
 The issue is that composer `repositories` key is not inherited from
-dependencies. So, if your module defines a custom repository for a JS library,
-composer won't see it when users install your module. This plugin solves the
-problem by downloading assets defined in `extra.omeka-assets` after your package
-is installed, bypassing the repository inheritance limitation. Assets are
-downloaded directly from their source URLs.
+dependencies. If your package defines a custom repository for a JS library,
+composer won't see it when users install your package. This plugin solves the
+problem by downloading assets defined in `extra.external-assets` after your
+package is installed, bypassing the repository inheritance limitation. Assets
+are downloaded directly from their source URLs.
+
+This is a lightweight solution. For more features, consider [civicrm/composer-downloads-plugin],
+that has more options (variables, ignore patterns, executable flag), or any
+other similar package of your choice.
 
 
 Installation
 ------------
 
-Add to your module `composer.json`:
+Add to your package `composer.json`:
 
 ```json
 {
     "require": {
-        "daniel-km/omeka-assets": "^1.0"
+        "daniel-km/external-assets": "^1.0"
     }
 }
 ```
 
-When users install your module via composer, assets are downloaded
+When users install your package via composer, assets are downloaded
 automatically.
 
 
 Usage
 -----
 
-Define assets in `extra.omeka-assets` in the module `composer.json`:
+Define assets in `extra.external-assets` in your package `composer.json`:
 
 ```json
 {
     "extra": {
-        "omeka-assets": {
+        "external-assets": {
             "asset/vendor/mirador/": "https://github.com/ProjectMirador/mirador/releases/download/v3.3.0/mirador.zip",
             "asset/vendor/lib/jquery.autocomplete.min.js": "https://cdn.example.com/jquery.autocomplete-1.5.0.min.js"
         }
@@ -53,7 +56,7 @@ Define assets in `extra.omeka-assets` in the module `composer.json`:
 }
 ```
 
-The key is the destination path (relative to your module directory), the value
+The key is the destination path (relative to your package directory), the value
 is the source URL.
 
 | Destination         | URL                     | Behavior                         |
@@ -77,20 +80,18 @@ Rules:
 
 ```json
 {
-    "name": "your-vendor/omeka-s-module-viewer",
-    "type": "omeka-s-module",
+    "name": "your-vendor/your-package",
+    "type": "library",
     "require": {
-        "omeka/omeka-s-core": "^4.0",
-        "daniel-km/omeka-assets": "^1.0"
+        "daniel-km/external-assets": "^1.0"
     },
     "autoload": {
         "psr-4": {
-            "Viewer\\": "src/"
+            "YourPackage\\": "src/"
         }
     },
     "extra": {
-        "installer-name": "Viewer",
-        "omeka-assets": {
+        "external-assets": {
             "asset/vendor/openseadragon/": "https://github.com/openseadragon/openseadragon/releases/download/v4.1.0/openseadragon-bin-4.1.0.zip",
             "asset/vendor/leaflet/": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.zip",
             "asset/vendor/js/helper.min.js": "https://cdn.example.com/helper-2.0.min.js"
@@ -99,28 +100,26 @@ Rules:
 }
 ```
 
-### CLI tool for manual installations
+### Cli tool for manual installations
 
-For modules installed via `git clone`, assets are not downloaded automatically.
-Use the CLI tool:
+For packages installed via `git clone`, assets are not downloaded automatically.
+Use the cli tool:
 
 ```sh
-# From Omeka S root directory
-php vendor/bin/omeka-assets modules/ModuleName
+# From project root directory
+php vendor/bin/external-assets /path/to/package
 
 # Force re-download
-php vendor/bin/omeka-assets --force modules/ModuleName
+php vendor/bin/external-assets --force /path/to/package
 
-# Multiple modules
-php vendor/bin/omeka-assets modules/Module1 modules/Module2 themes/mytheme
+# Multiple packages
+php vendor/bin/external-assets /path/to/package1 /path/to/package2
 ```
 
 | Option    | Description                                   |
 |-----------|-----------------------------------------------|
 | `--force` | Re-download assets even if they already exist |
 | `--help`  | Show usage information                        |
-
-Note: The CLI tool requires `daniel-km/omeka-assets` to be installed.
 
 ### Best practices
 
@@ -144,7 +143,7 @@ How it works
 1. The plugin subscribes to composer `post-package-install` and
    `post-package-update` events.
 
-2. When a package is installed, it checks for `extra.omeka-assets`.
+2. When a package is installed, it checks for `extra.external-assets`.
 
 3. For each asset, it downloads the file and either saves it directly, extracts
    it (for archives), or copies it into the target directory.
@@ -179,9 +178,9 @@ See online issues on the [plugin issues] page on GitLab.
 
 ### Assets not downloading
 
-- Ensure your module requires `daniel-km/omeka-assets`
+- Ensure your package requires `daniel-km/external-assets`
 - Verify URLs are accessible: `curl -I https://your-url.com/file.js`
-- Check that the module directory is writeable
+- Check that the package directory is writeable
 
 ### Archive extraction fails
 
@@ -193,7 +192,7 @@ The plugin uses `unzip`/`ZipArchive` for `.zip` and `tar`/`PharData` for
 Use `--force` to re-download:
 
 ```sh
-php vendor/bin/omeka-assets --force modules/ModuleName
+php vendor/bin/external-assets --force /path/to/package
 ```
 
 
@@ -230,14 +229,16 @@ of the CeCILL license and that you accept its terms.
 Copyright
 ---------
 
-- Copyright Daniel Berthereau, 2026 (see [Daniel-KM] on GitLab)
+- Copyright Daniel Berthereau, 2025-2026 (see [Daniel-KM] on GitLab)
 
-This plugin was designed for the [digital library Manioc] of the [Université des Antilles]
-(subvention Agence bibliographique de l'enseignement supérieur [Abes]).
+This plugin was originally designed for [Omeka S] modules for the [digital library Manioc]
+of the [Université des Antilles] (subvention Agence bibliographique de l’enseignement supérieur [Abes]).
 
 
-[Omeka Assets]: https://gitlab.com/Daniel-KM/Omeka-Composer-plugin-external-assets
+[External Assets]: https://gitlab.com/Daniel-KM/Omeka-Composer-plugin-external-assets
 [Omeka S]: https://omeka.org/s
+[civicrm/composer-downloads-plugin]: https://github.com/civicrm/composer-downloads-plugin
+[lastcall/composer-extra-files]: https://packagist.org/packages/lastcall/composer-extra-files
 [plugin issues]: https://gitlab.com/Daniel-KM/Omeka-Composer-plugin-external-assets/-/issues
 [CeCILL v2.1]: https://www.cecill.info/licences/Licence_CeCILL_V2.1-en.html
 [GNU/GPL]: https://www.gnu.org/licenses/gpl-3.0.html

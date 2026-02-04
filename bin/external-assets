@@ -1,21 +1,21 @@
 #!/usr/bin/env php
 <?php
 /**
- * CLI tool to install omeka-assets for modules/themes.
+ * CLI tool to install external assets for packages.
  *
- * For add-ons installed via git clone, external assets (js, css, etc.) defined
+ * For packages installed via git clone, external assets (js, css, etc.) defined
  * in composer.json are not downloaded automatically by Composer. This script
- * reads the add-on composer.json and downloads the assets.
+ * reads the package composer.json and downloads the assets.
  *
- * Note: Add-ons installed via `composer require` have their assets downloaded
- * automatically by the omeka/omeka-assets Composer plugin.
+ * Note: Packages installed via `composer require` have their assets downloaded
+ * automatically by the daniel-km/external-assets Composer plugin.
  *
  * Usage:
- *   php bin/omeka-assets /path/to/module
+ *   php bin/external-assets /path/to/package
  *
  * Examples:
- *   php bin/omeka-assets /var/www/omeka-s/modules/MyModule
- *   php bin/omeka-assets --force /var/www/omeka-s/modules/MyModule
+ *   php bin/external-assets /var/www/project/modules/MyModule
+ *   php bin/external-assets --force /var/www/project/modules/MyModule
  *
  * Options:
  *   --force     Re-download even if assets already exist
@@ -24,7 +24,7 @@
 
 declare(strict_types=1);
 
-namespace Omeka\OmekaAssets;
+namespace DanielKm\ExternalAssets;
 
 // Handle autoload - try different locations for standalone usage
 $autoloadPaths = [
@@ -43,7 +43,7 @@ foreach ($autoloadPaths as $autoloadPath) {
 
 if (!$autoloaded) {
     // Minimal inline implementation for when running without composer
-    require_once __DIR__ . '/../src/OmekaAssetsPlugin.php';
+    require_once __DIR__ . '/../src/ExternalAssetsPlugin.php';
 }
 
 // Parse arguments
@@ -64,30 +64,30 @@ foreach ($args as $arg) {
 
 if ($help || empty($paths)) {
     echo <<<HELP
-Omeka Assets Installer
+External Assets Installer
 
-Install external assets (JS, CSS, etc.) defined in a module or theme's
-composer.json "extra.omeka-assets" section.
+Install external assets (JS, CSS, etc.) defined in a package's composer.json
+"extra.external-assets" section.
 
 Usage:
-  php bin/omeka-assets [options] <path> [<path2> ...]
+  php bin/external-assets [options] <path> [<path2> ...]
 
 Arguments:
-  path              Path to module or theme directory
+  path              Path to package directory
 
 Options:
   --force           Re-download even if assets already exist
   --help, -h        Show this help message
 
 Examples:
-  php bin/omeka-assets /var/www/omeka-s/modules/MyModule
-  php bin/omeka-assets --force /var/www/omeka-s/modules/Common /var/www/omeka-s/themes/mytheme
+  php bin/external-assets /var/www/project/modules/MyModule
+  php bin/external-assets --force /var/www/project/modules/Common
 
 The script reads each directory's composer.json and downloads the assets
-defined in the "extra.omeka-assets" section:
+defined in the "extra.external-assets" section:
 
   "extra": {
-      "omeka-assets": {
+      "external-assets": {
           "asset/vendor/lib/file.min.js": "https://example.com/file.min.js",
           "asset/vendor/lib/": "https://example.com/archive.zip"
       }
@@ -138,15 +138,15 @@ foreach ($paths as $path) {
     }
 
     $json = json_decode(file_get_contents($composerJson), true);
-    if (empty($json['extra']['omeka-assets'])) {
-        $logger->info("No omeka-assets defined in " . basename($path));
+    if (empty($json['extra']['external-assets'])) {
+        $logger->info("No external-assets defined in " . basename($path));
         continue;
     }
 
     $logger->write("Processing " . basename($path) . "...");
 
     $success = true;
-    foreach ($json['extra']['omeka-assets'] as $destination => $url) {
+    foreach ($json['extra']['external-assets'] as $destination => $url) {
         $destPath = $path . '/' . ltrim($destination, '/');
         $isDirectory = substr($destination, -1) === '/';
         $isArchive = (bool) preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
@@ -221,7 +221,7 @@ function downloadFile(string $url, string $destPath): void
 function downloadAndExtract(string $url, string $destPath): void
 {
     $tempFile = sys_get_temp_dir() . '/' . basename($url);
-    $tempDir = sys_get_temp_dir() . '/omeka_extract_' . uniqid();
+    $tempDir = sys_get_temp_dir() . '/external_extract_' . uniqid();
 
     mkdir($tempDir, 0755, true);
 
@@ -260,7 +260,7 @@ function fetchUrl(string $url): string
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',
-            'header' => "User-Agent: omeka-assets/1.0\r\n",
+            'header' => "User-Agent: external-assets/1.0\r\n",
             'follow_location' => true,
             'timeout' => 60,
         ],

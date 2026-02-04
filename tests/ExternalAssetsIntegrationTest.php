@@ -2,43 +2,43 @@
 
 declare(strict_types=1);
 
-namespace Omeka\OmekaAssets\Test;
+namespace DanielKm\ExternalAssets\Test;
 
-use Omeka\OmekaAssets\OmekaAssetsPlugin;
+use DanielKm\ExternalAssets\ExternalAssetsPlugin;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Integration tests for OmekaAssetsPlugin with Omeka S.
+ * Integration tests for ExternalAssetsPlugin.
  *
- * These tests verify the plugin works correctly when installed in an Omeka S
- * environment. They require the Omeka S test fixtures to be set up.
+ * These tests verify the plugin works correctly when installed. They require
+ * the test fixtures to be set up.
  *
  * To run these tests:
- * 1. Install this plugin in an Omeka S installation
- * 2. Set the OMEKA_PATH environment variable
+ * 1. Install this plugin in a project
+ * 2. Set the PROJECT_PATH environment variable
  * 3. Run: vendor/bin/phpunit --group integration
  *
  * @group integration
  */
-class OmekaAssetsIntegrationTest extends TestCase
+class ExternalAssetsIntegrationTest extends TestCase
 {
-    protected ?string $omekaPath = null;
+    protected ?string $projectPath = null;
     protected ?string $testModulePath = null;
 
     protected function setUp(): void
     {
-        $this->omekaPath = getenv('OMEKA_PATH') ?: null;
+        $this->projectPath = getenv('PROJECT_PATH') ?: null;
 
-        if (!$this->omekaPath) {
-            $this->markTestSkipped('OMEKA_PATH environment variable not set. Set it to run integration tests.');
+        if (!$this->projectPath) {
+            $this->markTestSkipped('PROJECT_PATH environment variable not set. Set it to run integration tests.');
         }
 
-        if (!is_dir($this->omekaPath)) {
-            $this->markTestSkipped("OMEKA_PATH '$this->omekaPath' is not a valid directory.");
+        if (!is_dir($this->projectPath)) {
+            $this->markTestSkipped("PROJECT_PATH '$this->projectPath' is not a valid directory.");
         }
 
         // Create a temporary test module directory
-        $this->testModulePath = sys_get_temp_dir() . '/OmekaAssetsTestModule_' . uniqid();
+        $this->testModulePath = sys_get_temp_dir() . '/ExternalAssetsTestModule_' . uniqid();
         mkdir($this->testModulePath);
     }
 
@@ -51,17 +51,16 @@ class OmekaAssetsIntegrationTest extends TestCase
     }
 
     /**
-     * Test that plugin correctly identifies packages with omeka-assets.
+     * Test that plugin correctly identifies packages with external-assets.
      */
-    public function testPackageWithOmekaAssets(): void
+    public function testPackageWithExternalAssets(): void
     {
-        // Create a test composer.json with omeka-assets
+        // Create a test composer.json with external-assets
         $composerJson = [
-            'name' => 'test/omeka-assets-test',
-            'type' => 'omeka-s-module',
+            'name' => 'test/external-assets-test',
+            'type' => 'library',
             'extra' => [
-                'installer-name' => 'OmekaAssetsTest',
-                'omeka-assets' => [
+                'external-assets' => [
                     'asset/vendor/test/file.js' => 'https://example.com/test.js',
                 ],
             ],
@@ -77,7 +76,7 @@ class OmekaAssetsIntegrationTest extends TestCase
 
         $content = json_decode(file_get_contents($this->testModulePath . '/composer.json'), true);
         $this->assertArrayHasKey('extra', $content);
-        $this->assertArrayHasKey('omeka-assets', $content['extra']);
+        $this->assertArrayHasKey('external-assets', $content['extra']);
     }
 
     /**
@@ -87,13 +86,13 @@ class OmekaAssetsIntegrationTest extends TestCase
      */
     public function testCliToolExecution(): void
     {
-        $binPath = dirname(__DIR__) . '/bin/omeka-assets';
+        $binPath = dirname(__DIR__) . '/bin/external-assets';
 
         // Test --help flag
         $output = [];
         exec("php $binPath --help 2>&1", $output, $exitCode);
         $this->assertEquals(0, $exitCode);
-        $this->assertStringContainsString('Omeka Assets Installer', implode("\n", $output));
+        $this->assertStringContainsString('External Assets Installer', implode("\n", $output));
     }
 
     /**
@@ -101,9 +100,9 @@ class OmekaAssetsIntegrationTest extends TestCase
      */
     public function testPluginClassStructure(): void
     {
-        $this->assertTrue(class_exists(OmekaAssetsPlugin::class));
+        $this->assertTrue(class_exists(ExternalAssetsPlugin::class));
 
-        $reflection = new \ReflectionClass(OmekaAssetsPlugin::class);
+        $reflection = new \ReflectionClass(ExternalAssetsPlugin::class);
 
         // Check required interface implementations
         $this->assertTrue($reflection->implementsInterface(\Composer\Plugin\PluginInterface::class));
@@ -123,7 +122,7 @@ class OmekaAssetsIntegrationTest extends TestCase
      */
     public function testSubscribedEvents(): void
     {
-        $events = OmekaAssetsPlugin::getSubscribedEvents();
+        $events = ExternalAssetsPlugin::getSubscribedEvents();
 
         $this->assertIsArray($events);
         $this->assertArrayHasKey(\Composer\Installer\PackageEvents::POST_PACKAGE_INSTALL, $events);

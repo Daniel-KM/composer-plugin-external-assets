@@ -2,31 +2,31 @@
 
 declare(strict_types=1);
 
-namespace Omeka\OmekaAssets\Test;
+namespace DanielKm\ExternalAssets\Test;
 
 use Composer\Composer;
 use Composer\Config;
 use Composer\Installer\InstallationManager;
 use Composer\IO\IOInterface;
 use Composer\Package\PackageInterface;
-use Omeka\OmekaAssets\OmekaAssetsPlugin;
+use DanielKm\ExternalAssets\ExternalAssetsPlugin;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Mock-based tests for OmekaAssetsPlugin download logic.
+ * Mock-based tests for ExternalAssetsPlugin download logic.
  *
  * These tests verify the download and extraction logic without making actual
  * HTTP requests. They use a testable subclass that allows injecting mock
  * download behavior.
  */
-class OmekaAssetsDownloadTest extends TestCase
+class ExternalAssetsDownloadTest extends TestCase
 {
     protected string $tempDir;
     protected string $installPath;
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir() . '/omeka_assets_test_' . uniqid();
+        $this->tempDir = sys_get_temp_dir() . '/external_assets_test_' . uniqid();
         $this->installPath = $this->tempDir . '/modules/TestModule';
         mkdir($this->installPath, 0755, true);
     }
@@ -47,12 +47,12 @@ class OmekaAssetsDownloadTest extends TestCase
         ]);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/lib/jquery.autocomplete.min.js' => 'https://example.com/jquery.autocomplete-1.5.0.min.js',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $expectedFile = $this->installPath . '/asset/vendor/lib/jquery.autocomplete.min.js';
         $this->assertFileExists($expectedFile);
@@ -70,12 +70,12 @@ class OmekaAssetsDownloadTest extends TestCase
         ]);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/scripts/' => 'https://example.com/helper.js',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $expectedFile = $this->installPath . '/asset/vendor/scripts/helper.js';
         $this->assertFileExists($expectedFile);
@@ -99,12 +99,12 @@ class OmekaAssetsDownloadTest extends TestCase
         ], true);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/library/' => 'https://example.com/library-1.0.0.zip',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $baseDir = $this->installPath . '/asset/vendor/library';
         $this->assertFileExists($baseDir . '/lib.min.js');
@@ -130,12 +130,12 @@ class OmekaAssetsDownloadTest extends TestCase
         ], true);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/library/' => 'https://github.com/vendor/library/releases/download/v1.0.0/library.zip',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         // Files should be directly in library/, not library/library-1.0.0/
         $baseDir = $this->installPath . '/asset/vendor/library';
@@ -161,12 +161,12 @@ class OmekaAssetsDownloadTest extends TestCase
         ], true);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/library/' => 'https://example.com/library.zip',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $baseDir = $this->installPath . '/asset/vendor/library';
         $this->assertFileExists($baseDir . '/lib.min.js');
@@ -190,12 +190,12 @@ class OmekaAssetsDownloadTest extends TestCase
         ], true);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/package/' => 'https://example.com/package.tar.gz',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $baseDir = $this->installPath . '/asset/vendor/package';
         $this->assertFileExists($baseDir . '/script.js');
@@ -214,14 +214,14 @@ class OmekaAssetsDownloadTest extends TestCase
         ]);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/lib1.min.js' => 'https://example.com/lib1.js',
                 'asset/vendor/lib2.min.js' => 'https://example.com/lib2.js',
                 'asset/css/styles.css' => 'https://example.com/styles.css',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $this->assertFileExists($this->installPath . '/asset/vendor/lib1.min.js');
         $this->assertFileExists($this->installPath . '/asset/vendor/lib2.min.js');
@@ -231,16 +231,16 @@ class OmekaAssetsDownloadTest extends TestCase
     }
 
     /**
-     * Test that package without omeka-assets is handled gracefully.
+     * Test that package without external-assets is handled gracefully.
      */
-    public function testPackageWithoutOmekaAssets(): void
+    public function testPackageWithoutExternalAssets(): void
     {
         $plugin = $this->createTestablePlugin([]);
 
         $package = $this->createMockPackage([]);
 
         // Should not throw, should not create any files
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $this->assertDirectoryExists($this->installPath);
         $entries = array_diff(scandir($this->installPath), ['.', '..']);
@@ -248,17 +248,17 @@ class OmekaAssetsDownloadTest extends TestCase
     }
 
     /**
-     * Test that empty omeka-assets is handled gracefully.
+     * Test that empty external-assets is handled gracefully.
      */
-    public function testEmptyOmekaAssets(): void
+    public function testEmptyExternalAssets(): void
     {
         $plugin = $this->createTestablePlugin([]);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [],
+            'external-assets' => [],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $entries = array_diff(scandir($this->installPath), ['.', '..']);
         $this->assertEmpty($entries);
@@ -275,14 +275,14 @@ class OmekaAssetsDownloadTest extends TestCase
         ]);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/exists.js' => 'https://example.com/exists.js',
                 'asset/vendor/missing.js' => 'https://example.com/missing.js',
             ],
         ]);
 
         // Should not throw - failure is logged but processing continues
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         // First file should exist
         $this->assertFileExists($this->installPath . '/asset/vendor/exists.js');
@@ -300,12 +300,12 @@ class OmekaAssetsDownloadTest extends TestCase
         ]);
 
         $package = $this->createMockPackage([
-            'omeka-assets' => [
+            'external-assets' => [
                 'asset/vendor/very/deep/nested/path/file.js' => 'https://example.com/deep.js',
             ],
         ]);
 
-        $plugin->testHandleOmekaAssets($package, $this->installPath);
+        $plugin->testHandleExternalAssets($package, $this->installPath);
 
         $expectedFile = $this->installPath . '/asset/vendor/very/deep/nested/path/file.js';
         $this->assertFileExists($expectedFile);
@@ -414,7 +414,7 @@ class OmekaAssetsDownloadTest extends TestCase
      * @param array $urlContentMap Map of URL => content for mock downloads
      * @param bool $handleArchives Whether to actually extract archives
      */
-    protected function createTestablePlugin(array $urlContentMap, bool $handleArchives = false): TestableOmekaAssetsPlugin
+    protected function createTestablePlugin(array $urlContentMap, bool $handleArchives = false): TestableExternalAssetsPlugin
     {
         $io = $this->createMock(IOInterface::class);
         $io->method('write')->willReturn(null);
@@ -425,7 +425,7 @@ class OmekaAssetsDownloadTest extends TestCase
         $composer = $this->createMock(Composer::class);
         $composer->method('getConfig')->willReturn($config);
 
-        $plugin = new TestableOmekaAssetsPlugin($urlContentMap, $handleArchives);
+        $plugin = new TestableExternalAssetsPlugin($urlContentMap, $handleArchives);
         $plugin->activate($composer, $io);
 
         return $plugin;
@@ -524,9 +524,9 @@ class OmekaAssetsDownloadTest extends TestCase
 }
 
 /**
- * Testable subclass of OmekaAssetsPlugin that allows mocking downloads.
+ * Testable subclass of ExternalAssetsPlugin that allows mocking downloads.
  */
-class TestableOmekaAssetsPlugin extends OmekaAssetsPlugin
+class TestableExternalAssetsPlugin extends ExternalAssetsPlugin
 {
     /** @var array Map of URL => content for mock downloads */
     protected array $urlContentMap;
@@ -541,16 +541,16 @@ class TestableOmekaAssetsPlugin extends OmekaAssetsPlugin
     }
 
     /**
-     * Expose handleOmekaAssets for testing with custom install path.
+     * Expose handleExternalAssets for testing with custom install path.
      */
-    public function testHandleOmekaAssets(object $package, string $installPath): void
+    public function testHandleExternalAssets(object $package, string $installPath): void
     {
         $extra = $package->getExtra();
-        if (empty($extra['omeka-assets']) || !is_array($extra['omeka-assets'])) {
+        if (empty($extra['external-assets']) || !is_array($extra['external-assets'])) {
             return;
         }
 
-        foreach ($extra['omeka-assets'] as $destination => $url) {
+        foreach ($extra['external-assets'] as $destination => $url) {
             $destPath = $installPath . '/' . ltrim($destination, '/');
             $isDirectory = substr($destination, -1) === '/';
             $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
@@ -605,8 +605,8 @@ class TestableOmekaAssetsPlugin extends OmekaAssetsPlugin
             throw new \RuntimeException("Mock download failed: URL not in map: $url");
         }
 
-        $tempFile = sys_get_temp_dir() . '/omeka_test_' . uniqid() . '_' . basename($url);
-        $tempDir = sys_get_temp_dir() . '/omeka_extract_test_' . uniqid();
+        $tempFile = sys_get_temp_dir() . '/external_test_' . uniqid() . '_' . basename($url);
+        $tempDir = sys_get_temp_dir() . '/external_extract_test_' . uniqid();
 
         mkdir($tempDir, 0755, true);
         file_put_contents($tempFile, $this->urlContentMap[$url]);

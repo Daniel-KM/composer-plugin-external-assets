@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Omeka\OmekaAssets\Test;
+namespace DanielKm\ExternalAssets\Test;
 
 use PHPUnit\Framework\TestCase;
 
 /**
- * Test OmekaAssetsPlugin functionality.
+ * Test ExternalAssetsPlugin functionality.
  *
  * Note: These tests verify the configuration parsing and logic without making
  * actual HTTP requests. Integration tests that actually download files are
- * in OmekaAssetsIntegrationTest.php.
+ * in ExternalAssetsIntegrationTest.php.
  */
-class OmekaAssetsPluginTest extends TestCase
+class ExternalAssetsPluginTest extends TestCase
 {
     /**
-     * @dataProvider omekaAssetsProvider
+     * @dataProvider externalAssetsProvider
      */
-    public function testOmekaAssetsDestinationDetection(string $destination, string $url, bool $expectDirectory, bool $expectArchive): void
+    public function testExternalAssetsDestinationDetection(string $destination, string $url, bool $expectDirectory, bool $expectArchive): void
     {
         $isDirectory = substr($destination, -1) === '/';
         $isArchive = (bool) preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
@@ -27,7 +27,7 @@ class OmekaAssetsPluginTest extends TestCase
         $this->assertEquals($expectArchive, $isArchive, "Archive detection for: $url");
     }
 
-    public function omekaAssetsProvider(): array
+    public function externalAssetsProvider(): array
     {
         return [
             // [destination, url, expectDirectory, expectArchive]
@@ -72,9 +72,9 @@ class OmekaAssetsPluginTest extends TestCase
     }
 
     /**
-     * @dataProvider omekaAssetsActionProvider
+     * @dataProvider externalAssetsActionProvider
      */
-    public function testOmekaAssetsActionDetection(string $destination, string $url, string $expectedAction): void
+    public function testExternalAssetsActionDetection(string $destination, string $url, string $expectedAction): void
     {
         $isDirectory = substr($destination, -1) === '/';
         $isArchive = (bool) preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
@@ -90,7 +90,7 @@ class OmekaAssetsPluginTest extends TestCase
         $this->assertEquals($expectedAction, $action, "Action for: $destination <- $url");
     }
 
-    public function omekaAssetsActionProvider(): array
+    public function externalAssetsActionProvider(): array
     {
         return [
             // [destination, url, expectedAction]
@@ -117,7 +117,7 @@ class OmekaAssetsPluginTest extends TestCase
     public function testArchiveSingleRootDirectoryStripping(): void
     {
         // Simulate the logic that detects a single root directory.
-        $tempDir = sys_get_temp_dir() . '/omeka_test_' . uniqid();
+        $tempDir = sys_get_temp_dir() . '/external_test_' . uniqid();
         mkdir($tempDir);
         mkdir($tempDir . '/mirador-2.7.0');
         touch($tempDir . '/mirador-2.7.0/file1.js');
@@ -144,7 +144,7 @@ class OmekaAssetsPluginTest extends TestCase
     public function testArchiveMultipleEntriesNoStripping(): void
     {
         // Simulate an archive with multiple root entries.
-        $tempDir = sys_get_temp_dir() . '/omeka_test_' . uniqid();
+        $tempDir = sys_get_temp_dir() . '/external_test_' . uniqid();
         mkdir($tempDir);
         touch($tempDir . '/file1.js');
         touch($tempDir . '/file2.js');
@@ -160,11 +160,11 @@ class OmekaAssetsPluginTest extends TestCase
         rmdir($tempDir);
     }
 
-    public function testOmekaAssetsConfigParsing(): void
+    public function testExternalAssetsConfigParsing(): void
     {
         $composerJson = [
             'extra' => [
-                'omeka-assets' => [
+                'external-assets' => [
                     'asset/vendor/jquery-autocomplete/jquery.autocomplete.min.js' => 'https://example.com/jquery.autocomplete.min.js',
                     'asset/vendor/mirador/' => 'https://example.com/mirador.zip',
                 ],
@@ -172,31 +172,31 @@ class OmekaAssetsPluginTest extends TestCase
         ];
 
         $extra = $composerJson['extra'];
-        $this->assertArrayHasKey('omeka-assets', $extra);
-        $this->assertIsArray($extra['omeka-assets']);
-        $this->assertCount(2, $extra['omeka-assets']);
+        $this->assertArrayHasKey('external-assets', $extra);
+        $this->assertIsArray($extra['external-assets']);
+        $this->assertCount(2, $extra['external-assets']);
 
-        foreach ($extra['omeka-assets'] as $destination => $url) {
+        foreach ($extra['external-assets'] as $destination => $url) {
             $this->assertIsString($destination);
             $this->assertIsString($url);
             $this->assertStringStartsWith('https://', $url);
         }
     }
 
-    public function testEmptyOmekaAssetsConfig(): void
+    public function testEmptyExternalAssetsConfig(): void
     {
         $composerJson = [
             'extra' => [],
         ];
 
         $extra = $composerJson['extra'];
-        $hasAssets = !empty($extra['omeka-assets']) && is_array($extra['omeka-assets']);
+        $hasAssets = !empty($extra['external-assets']) && is_array($extra['external-assets']);
         $this->assertFalse($hasAssets);
     }
 
     public function testAssetExistsForFile(): void
     {
-        $tempDir = sys_get_temp_dir() . '/omeka_test_' . uniqid();
+        $tempDir = sys_get_temp_dir() . '/external_test_' . uniqid();
         mkdir($tempDir);
 
         // Non-existent file
@@ -213,7 +213,7 @@ class OmekaAssetsPluginTest extends TestCase
 
     public function testAssetExistsForDirectory(): void
     {
-        $tempDir = sys_get_temp_dir() . '/omeka_test_' . uniqid();
+        $tempDir = sys_get_temp_dir() . '/external_test_' . uniqid();
         mkdir($tempDir);
 
         // Non-existent directory
@@ -238,8 +238,8 @@ class OmekaAssetsPluginTest extends TestCase
 
     public function testMoveDirectoryContents(): void
     {
-        $srcDir = sys_get_temp_dir() . '/omeka_test_src_' . uniqid();
-        $dstDir = sys_get_temp_dir() . '/omeka_test_dst_' . uniqid();
+        $srcDir = sys_get_temp_dir() . '/external_test_src_' . uniqid();
+        $dstDir = sys_get_temp_dir() . '/external_test_dst_' . uniqid();
 
         mkdir($srcDir);
         mkdir($srcDir . '/subdir');
