@@ -10,6 +10,8 @@ use Composer\Installer\PackageEvent;
 use Composer\Installer\PackageEvents;
 use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
+use Composer\Script\Event as ScriptEvent;
+use Composer\Script\ScriptEvents;
 use Composer\Util\Filesystem;
 use Composer\Util\HttpDownloader;
 use Composer\Util\ProcessExecutor;
@@ -61,6 +63,8 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
         return [
             PackageEvents::POST_PACKAGE_INSTALL => 'onPostPackageInstall',
             PackageEvents::POST_PACKAGE_UPDATE => 'onPostPackageUpdate',
+            ScriptEvents::POST_INSTALL_CMD => 'onPostInstallOrUpdate',
+            ScriptEvents::POST_UPDATE_CMD => 'onPostInstallOrUpdate',
         ];
     }
 
@@ -83,6 +87,35 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
     }
 
     /**
+     * After install/update, download any missing assets for all packages.
+     *
+     * This covers two cases not handled by per-package events:
+     * - Root package assets (root never fires POST_PACKAGE_INSTALL).
+     * - Assets deleted after initial install (no package event fires).
+     */
+    public function onPostInstallOrUpdate(ScriptEvent $event)
+    {
+        // Process root package.
+        $rootPackage = $this->composer->getPackage();
+        $rootExtra = $rootPackage->getExtra();
+        if (!empty($rootExtra['external-assets']) && is_array($rootExtra['external-assets'])) {
+            $rootDir = getcwd();
+            $this->downloadMissingAssets($rootExtra['external-assets'], $rootDir, $rootPackage->getPrettyName());
+        }
+
+        // Process all installed packages.
+        $repo = $this->composer->getRepositoryManager()->getLocalRepository();
+        foreach ($repo->getPackages() as $package) {
+            $extra = $package->getExtra();
+            if (empty($extra['external-assets']) || !is_array($extra['external-assets'])) {
+                continue;
+            }
+            $installPath = $this->composer->getInstallationManager()->getInstallPath($package);
+            $this->downloadMissingAssets($extra['external-assets'], $installPath, $package->getPrettyName());
+        }
+    }
+
+    /**
      * Download and install assets defined in extra.external-assets.
      */
     protected function handleExternalAssets($package)
@@ -93,23 +126,39 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
         }
 
         $installPath = $this->composer->getInstallationManager()->getInstallPath($package);
+        $this->downloadMissingAssets($extra['external-assets'], $installPath, $package->getPrettyName());
+    }
 
-        foreach ($extra['external-assets'] as $destination => $url) {
-            $destPath = $installPath . '/' . ltrim($destination, '/');
+    /**
+     * Download assets that are missing from the filesystem.
+     */
+    protected function downloadMissingAssets(array $assets, string $basePath, string $packageName): void
+    {
+        foreach ($assets as $destination => $url) {
+            $destPath = $basePath . '/' . ltrim($destination, '/');
             $isDirectory = substr($destination, -1) === '/';
+
+            // Skip assets that already exist.
+            if ($isDirectory) {
+                if (is_dir($destPath) && count(array_diff(scandir($destPath), ['.', '..'])) > 0) {
+                    continue;
+                }
+            } elseif (file_exists($destPath)) {
+                continue;
+            }
+
             $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
 
             $this->io->write(sprintf(
                 '<info>Downloading asset %s for %s...</info>',
                 basename($url),
-                $package->getPrettyName()
+                $packageName
             ));
 
             try {
                 if ($isDirectory && $isArchive) {
                     $this->downloadAndExtract($url, $destPath);
                 } elseif ($isDirectory) {
-                    // Directory destination + non-archive URL: copy file into directory.
                     $this->downloadFile($url, $destPath . basename($url));
                 } else {
                     $this->downloadFile($url, $destPath);
