@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sempia\ExternalAssets\Test;
 
 use PHPUnit\Framework\TestCase;
+use Sempia\ExternalAssets\ExternalAssetsPlugin;
 
 /**
  * Test ExternalAssetsPlugin functionality.
@@ -265,6 +266,106 @@ class ExternalAssetsPluginTest extends TestCase
         // srcDir should be empty now (files moved)
         @rmdir($srcDir . '/subdir');
         @rmdir($srcDir);
+    }
+
+    // -------------------------------------------------------------------------
+    // Tests: Subscribed events
+    // -------------------------------------------------------------------------
+
+    public function testSubscribedEventsIncludePackageEvents(): void
+    {
+        $events = ExternalAssetsPlugin::getSubscribedEvents();
+
+        $this->assertArrayHasKey('post-package-install', $events);
+        $this->assertArrayHasKey('post-package-update', $events);
+        $this->assertEquals('onPostPackageInstall', $events['post-package-install']);
+        $this->assertEquals('onPostPackageUpdate', $events['post-package-update']);
+    }
+
+    public function testSubscribedEventsIncludePostInstallAndUpdateCmd(): void
+    {
+        $events = ExternalAssetsPlugin::getSubscribedEvents();
+
+        $this->assertArrayHasKey('post-install-cmd', $events);
+        $this->assertArrayHasKey('post-update-cmd', $events);
+        $this->assertEquals('onPostInstallOrUpdate', $events['post-install-cmd']);
+        $this->assertEquals('onPostInstallOrUpdate', $events['post-update-cmd']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Tests: Skip-if-exists logic (mirrors downloadMissingAssets)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Test that the skip logic correctly identifies which assets to download.
+     *
+     * Mirrors the existence check in downloadMissingAssets():
+     * - Existing files are skipped.
+     * - Non-empty directories are skipped.
+     * - Missing files, empty directories, and missing directories are downloaded.
+     */
+    public function testSkipExistingAssetsMixedScenarios(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/external_test_skip_' . uniqid();
+        mkdir($tempDir, 0755, true);
+
+        $assets = [
+            'asset/vendor/lib/existing.js' => 'https://example.com/existing.js',
+            'asset/vendor/lib/missing.js' => 'https://example.com/missing.js',
+            'asset/vendor/full-lib/' => 'https://example.com/lib.zip',
+            'asset/vendor/empty-lib/' => 'https://example.com/lib2.zip',
+            'asset/vendor/no-lib/' => 'https://example.com/lib3.zip',
+        ];
+
+        // Pre-create: existing file.
+        mkdir($tempDir . '/asset/vendor/lib', 0755, true);
+        file_put_contents($tempDir . '/asset/vendor/lib/existing.js', 'old');
+        // missing.js intentionally not created.
+
+        // Pre-create: non-empty directory.
+        mkdir($tempDir . '/asset/vendor/full-lib', 0755, true);
+        file_put_contents($tempDir . '/asset/vendor/full-lib/file.js', 'content');
+
+        // Pre-create: empty directory.
+        mkdir($tempDir . '/asset/vendor/empty-lib', 0755, true);
+
+        // no-lib/ intentionally not created.
+
+        // Run the skip logic (same as downloadMissingAssets).
+        $toDownload = [];
+        foreach ($assets as $destination => $url) {
+            $destPath = $tempDir . '/' . ltrim($destination, '/');
+            $isDirectory = substr($destination, -1) === '/';
+
+            if ($isDirectory) {
+                if (is_dir($destPath) && count(array_diff(scandir($destPath), ['.', '..'])) > 0) {
+                    continue;
+                }
+            } elseif (file_exists($destPath)) {
+                continue;
+            }
+
+            $toDownload[] = $destination;
+        }
+
+        // Existing file and non-empty directory are skipped.
+        $this->assertNotContains('asset/vendor/lib/existing.js', $toDownload);
+        $this->assertNotContains('asset/vendor/full-lib/', $toDownload);
+
+        // Missing file, empty directory, and missing directory are downloaded.
+        $this->assertContains('asset/vendor/lib/missing.js', $toDownload);
+        $this->assertContains('asset/vendor/empty-lib/', $toDownload);
+        $this->assertContains('asset/vendor/no-lib/', $toDownload);
+
+        // Cleanup.
+        unlink($tempDir . '/asset/vendor/full-lib/file.js');
+        rmdir($tempDir . '/asset/vendor/full-lib');
+        rmdir($tempDir . '/asset/vendor/empty-lib');
+        unlink($tempDir . '/asset/vendor/lib/existing.js');
+        rmdir($tempDir . '/asset/vendor/lib');
+        rmdir($tempDir . '/asset/vendor');
+        rmdir($tempDir . '/asset');
+        rmdir($tempDir);
     }
 
     /**
