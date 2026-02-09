@@ -1,7 +1,6 @@
 {
     "name": "sempia/external-assets",
     "type": "composer-plugin",
-    "version": "1.0.0",
     "description": "Composer plugin to download external assets (JS, CSS, fonts, images) for any PHP project",
     "license": "CECILL-2.1",
     "keywords": ["assets", "composer-plugin", "download", "external"],

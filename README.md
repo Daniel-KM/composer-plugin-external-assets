@@ -137,15 +137,20 @@ php vendor/bin/external-assets /path/to/package1 /path/to/package2
 How it works
 ------------
 
-1. The plugin subscribes to composer `post-package-install` and
-   `post-package-update` events.
+The plugin subscribes to four composer events:
 
-2. When a package is installed, it checks for `extra.external-assets`.
+- **`post-package-install`** and **`post-package-update`**: download assets when
+  a package is first installed or updated.
 
-3. For each asset, it downloads the file and either saves it directly, extracts
-   it (for archives), or copies it into the target directory.
+- **`post-install-cmd`** and **`post-update-cmd`**: after every `composer install`
+  or `composer update`, check for missing assets across all packages (including
+  the root package) and download them. This ensures assets are restored if
+  deleted, and handles the root package whose assets are not covered by
+  per-package events.
 
-4. Assets are skipped if they already exist (idempotent).
+For each asset, the plugin downloads the file and either saves it directly,
+extracts it (for archives), or copies it into the target directory. Assets that
+already exist are skipped (idempotent).
 
 
 Requirements
