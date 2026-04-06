@@ -138,10 +138,18 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
             $destPath = $basePath . '/' . ltrim($destination, '/');
             $isDirectory = substr($destination, -1) === '/';
 
-            // Skip assets that already exist.
+            // Skip assets that already exist. Placeholder files committed to
+            // the repository (.htaccess, .gitkeep, .gitignore, index.html) are
+            // ignored so the directory is still considered empty.
             if ($isDirectory) {
-                if (is_dir($destPath) && count(array_diff(scandir($destPath), ['.', '..'])) > 0) {
-                    continue;
+                if (is_dir($destPath)) {
+                    $entries = array_diff(
+                        scandir($destPath),
+                        ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html']
+                    );
+                    if (count($entries) > 0) {
+                        continue;
+                    }
                 }
             } elseif (file_exists($destPath)) {
                 continue;
