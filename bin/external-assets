@@ -145,27 +145,41 @@ foreach ($paths as $path) {
 
     $logger->write("Processing " . basename($path) . "...");
 
+    $manifestPath = $path . '/vendor/external-assets.lock.json';
+    $manifest = is_file($manifestPath)
+        ? (json_decode((string) file_get_contents($manifestPath), true) ?: [])
+        : [];
+
     $success = true;
     foreach ($json['extra']['external-assets'] as $destination => $url) {
         $destPath = $path . '/' . ltrim($destination, '/');
         $isDirectory = substr($destination, -1) === '/';
         $isArchive = (bool) preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
 
-        // Check if asset exists (and skip if not forcing)
+        // Check if asset exists (and skip if URL unchanged and not forcing).
         if (!$force) {
             $exists = false;
             if ($isDirectory) {
                 if (is_dir($destPath)) {
-                    $entries = array_diff(scandir($destPath), ['.', '..']);
+                    $entries = array_diff(scandir($destPath), ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html']);
                     $exists = count($entries) > 0;
                 }
             } else {
                 $exists = file_exists($destPath);
             }
 
-            if ($exists) {
-                $logger->info("  Asset exists: $destination (use --force to re-download)");
+            $urlChanged = ($manifest[$destination] ?? null) !== $url;
+            if ($exists && !$urlChanged) {
+                $logger->info("  Asset up-to-date: $destination");
                 continue;
+            }
+            if ($exists && $urlChanged) {
+                $logger->info("  URL changed for $destination, re-downloading");
+                if ($isDirectory) {
+                    removeDirectory($destPath);
+                } else {
+                    @unlink($destPath);
+                }
             }
         } else {
             // Force mode: remove existing assets
@@ -188,11 +202,21 @@ foreach ($paths as $path) {
             } else {
                 downloadFile($url, $destPath);
             }
+            $manifest[$destination] = $url;
         } catch (\Exception $e) {
             $logger->error("  Failed: " . $e->getMessage());
             $success = false;
         }
     }
+
+    $manifest = array_intersect_key($manifest, $json['extra']['external-assets']);
+    if (!is_dir(dirname($manifestPath))) {
+        mkdir(dirname($manifestPath), 0755, true);
+    }
+    file_put_contents(
+        $manifestPath,
+        json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+    );
 
     if ($success) {
         $totalInstalled++;
