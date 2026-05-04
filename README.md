@@ -28,7 +28,7 @@ Add to your package `composer.json`:
 ```json
 {
     "require": {
-        "sempia/external-assets": "^1.0"
+        "sempia/external-assets": "^1.1"
     }
 }
 ```
@@ -80,7 +80,7 @@ Rules:
     "name": "your-vendor/your-package",
     "type": "library",
     "require": {
-        "sempia/external-assets": "^1.0"
+        "sempia/external-assets": "^1.1"
     },
     "autoload": {
         "psr-4": {
@@ -126,10 +126,12 @@ php vendor/bin/external-assets /path/to/package1 /path/to/package2
 
 3. Organize assets under `asset/vendor/` with a consistent structure.
 
-4. Add to `.gitignore`:
+4. Add downloaded assets to `.gitignore`:
    ```gitignore
    /asset/vendor/
    ```
+   The lock file lives in `vendor/external-assets.lock.json` and is therefore
+   already covered by the usual `/vendor/` gitignore.
 
 5. Test both installation methods: `composer require` and `git clone`.
 
@@ -149,8 +151,37 @@ The plugin subscribes to four composer events:
   per-package events.
 
 For each asset, the plugin downloads the file and either saves it directly,
-extracts it (for archives), or copies it into the target directory. Assets that
-already exist are skipped (idempotent).
+extracts it (for archives), or copies it into the target directory.
+
+### Lock file (`vendor/external-assets.lock.json`)
+
+Since version 1.1, the plugin maintains a `vendor/external-assets.lock.json`
+file inside each package, mapping each destination to the URL last installed:
+
+```json
+{
+    "asset/vendor/openseadragon/": "https://.../openseadragon-bin-4.1.0.zip",
+    "asset/vendor/js/helper.min.js": "https://cdn.example.com/helper-2.0.min.js"
+}
+```
+
+At every install/update, the plugin compares the URLs declared in
+`composer.json` against the URLs stored in the lock:
+
+- If the asset is present on disk and the URL is unchanged, it is skipped.
+- If the URL changed, the previous content is removed and the asset is
+  re-downloaded.
+- If the asset is missing, it is downloaded.
+
+The lock file represents the **local installed state** on a given machine,
+similar to `vendor/composer/installed.json` for composer. By placing it
+inside `vendor/`, the lock is naturally excluded from version control (since
+`vendor/` is universally gitignored). Each machine therefore maintains its
+own lock, which allows the plugin to correctly detect a stale install on a
+colleague's machine when only `composer.json` changes.
+
+Removing entries from `composer.json` cleans the lock accordingly, but the
+files already on disk are not removed automatically.
 
 
 Requirements
@@ -209,11 +240,20 @@ The plugin uses `unzip`/`ZipArchive` for `.zip` and `tar`/`PharData` for
 
 ### Assets outdated
 
-Use `--force` to re-download:
+Normally, changing the URL in `composer.json` is enough: the next install or
+update detects the URL change against `external-assets.lock.json` and
+re-downloads the asset.
+
+For a forced re-download (for example after manual changes on disk), use the
+cli tool:
 
 ```sh
 php vendor/bin/external-assets --force /path/to/package
 ```
+
+Alternatively, `composer reinstall <vendor/package>` wipes the package
+directory (including its lock file), which triggers a complete re-download on
+the next event.
 
 
 License
