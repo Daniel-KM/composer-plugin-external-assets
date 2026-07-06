@@ -168,6 +168,23 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
 
             $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
 
+            // Fetch the url with a native request to avoid the full stack trace
+            // displayed by composer when an asset is missing.
+            // Because the check does not share composer config (proxy/auth/CA
+            // set only in composer.json, not in env), an non-404/403/410 error
+            // go back to normal composer download.
+            $status = $this->remoteStatus($url);
+            if (in_array($status, [403, 404, 410], true)) {
+                $this->io->writeError(sprintf(
+                    '<error>External asset %s could not be downloaded for %s (HTTP %d): %s</error>',
+                    basename($url),
+                    $packageName,
+                    $status,
+                    $url
+                ));
+                continue;
+            }
+
             $this->io->write(sprintf(
                 '<info>Downloading asset %s for %s...</info>',
                 basename($url),
@@ -185,8 +202,9 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
                 $manifest[$destination] = $url;
             } catch (\Exception $e) {
                 $this->io->writeError(sprintf(
-                    '<warning>Failed to download asset %s: %s</warning>',
-                    $url,
+                    '<error>Failed to download asset %s for %s: %s</error>',
+                    basename($url),
+                    $packageName,
                     $e->getMessage()
                 ));
             }
@@ -199,6 +217,52 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
             $manifestPath,
             json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
         );
+    }
+
+    /**
+     * Get the HTTP status of a url without composer HttpDownloader.
+     *
+     * A native request is used so a failed lookup does not trigger composer
+     * async "Unhandled promise rejection" output.
+     *
+     * @return int The status code, or 0 when the host is unreachable.
+     */
+    protected function remoteStatus(string $url): int
+    {
+        if (extension_loaded('curl')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_NOBODY => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_USERAGENT => 'sempia/external-assets',
+            ]);
+            curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            curl_close($ch);
+            return $status;
+        }
+
+        $context = stream_context_create(['http' => [
+            'method' => 'HEAD',
+            'follow_location' => 1,
+            'timeout' => 30,
+            'ignore_errors' => true,
+        ]]);
+        $headers = @get_headers($url, false, $context);
+        if (!$headers) {
+            return 0;
+        }
+
+        foreach (array_reverse($headers) as $header) {
+            if (preg_match('~^HTTP/\S+\s+(\d{3})~', $header, $m)) {
+                return (int) $m[1];
+            }
+        }
+
+        return 0;
     }
 
     /**
