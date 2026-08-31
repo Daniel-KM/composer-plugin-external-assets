@@ -27,7 +27,11 @@ use Composer\Util\ProcessExecutor;
  *     "external-assets": {
  *         "asset/vendor/lib/file.min.js": "https://example.com/v3.4.0/file.min.js",
  *         "asset/vendor/lib/": "https://example.com/v3.4.1/archive.zip",
- *         "asset/vendor/scripts/": "https://example.com/script.js"
+ *         "asset/vendor/scripts/": "https://example.com/script.js",
+ *         "asset/vendor/other/": {
+ *             "url": "https://example.com/archive.zip",
+ *             "exclude": ["index.html", "docs", "*.map"]
+ *         }
  *     }
  * }
  *
@@ -35,6 +39,11 @@ use Composer\Util\ProcessExecutor;
  * - If destination ends with `/` and url has .zip/.tar.gz/.tgz, extract it.
  *   Note: if the archive contains a single root directory, it is stripped.
  * - If destination ends with `/` and url is a file, copy it into that directory.
+ * - A value may be an object with the keys `url` and `exclude`. Each exclude is
+ *   a path relative to the destination directory, with an optional glob, that
+ *   is removed after the download: an archive often ships a demo page or maps
+ *   that should not be published. Excludes are applied even when the assets are
+ *   already downloaded, so adding one is enough to remove the file.
  */
 class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
 {
@@ -140,7 +149,18 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
             : [];
         $filesystem = new Filesystem();
 
-        foreach ($assets as $destination => $url) {
+        foreach ($assets as $destination => $asset) {
+            $asset = $this->normalizeAsset($asset);
+            $url = $asset['url'];
+            if ($url === '') {
+                $this->io->writeError(sprintf(
+                    '<error>External asset "%s" of %s has no url.</error>',
+                    $destination,
+                    $packageName
+                ));
+                continue;
+            }
+
             $destPath = $basePath . '/' . ltrim($destination, '/');
             $isDirectory = substr($destination, -1) === '/';
             $exists = $isDirectory
@@ -152,6 +172,10 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
             $urlChanged = ($manifest[$destination] ?? null) !== $url;
 
             if ($exists && !$urlChanged) {
+                // Excludes are applied even when the assets are already there,
+                // so adding one to composer.json is enough to remove the file,
+                // without downloading the whole archive again.
+                $this->applyExcludes($destPath, $asset['exclude'], $packageName);
                 continue;
             }
 
@@ -199,6 +223,7 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
                 } else {
                     $this->downloadFile($url, $destPath);
                 }
+                $this->applyExcludes($destPath, $asset['exclude'], $packageName);
                 $manifest[$destination] = $url;
             } catch (\Exception $e) {
                 $this->io->writeError(sprintf(
@@ -276,6 +301,96 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
 
         $httpDownloader = new HttpDownloader($this->io, $this->composer->getConfig());
         $httpDownloader->copy($url, $destPath);
+    }
+
+    /**
+     * Normalize an asset of "extra.external-assets" to an array.
+     *
+     * A value is either the url as a string, or an object with the keys `url`
+     * and `exclude`. An invalid value returns an empty url, so the caller can
+     * report it instead of failing.
+     *
+     * @return array{url: string, exclude: string[]}
+     */
+    public function normalizeAsset($asset): array
+    {
+        if (is_string($asset)) {
+            return ['url' => $asset, 'exclude' => []];
+        }
+
+        if (!is_array($asset) || !isset($asset['url']) || !is_string($asset['url'])) {
+            return ['url' => '', 'exclude' => []];
+        }
+
+        $exclude = $asset['exclude'] ?? [];
+        if (!is_array($exclude)) {
+            $exclude = [$exclude];
+        }
+        $exclude = array_values(array_filter(
+            array_map(function ($pattern) {
+                return is_string($pattern) ? trim($pattern) : '';
+            }, $exclude),
+            'strlen'
+        ));
+
+        return ['url' => $asset['url'], 'exclude' => $exclude];
+    }
+
+    /**
+     * Remove the excluded paths from a destination directory.
+     *
+     * A pattern is relative to the destination and may hold a glob. A pattern
+     * escaping the destination (absolute or with "..") is skipped: an asset
+     * declaration must never remove a file outside of its own directory.
+     *
+     * @return string[] The removed paths, relative to the destination.
+     */
+    public function applyExcludes(string $destPath, array $exclude, ?string $packageName = null): array
+    {
+        if (!$exclude || !is_dir($destPath)) {
+            return [];
+        }
+
+        $base = realpath($destPath);
+        if ($base === false) {
+            return [];
+        }
+
+        $filesystem = new Filesystem();
+        $removed = [];
+        foreach ($exclude as $pattern) {
+            // Windows separators are normalized, so a single check is enough.
+            $normalized = str_replace('\\', '/', $pattern);
+            if ($pattern === ''
+                || strpos($pattern, "\0") !== false
+                || substr($normalized, 0, 1) === '/'
+                || preg_match('~^[a-zA-Z]:~', $normalized)
+                || preg_match('~(^|/)\.\.(/|$)~', $normalized)
+            ) {
+                if ($this->io) {
+                    $this->io->writeError(sprintf(
+                        '<warning>External asset exclude "%s"%s is skipped: it must be a path inside the destination.</warning>',
+                        $pattern,
+                        $packageName ? ' of ' . $packageName : ''
+                    ));
+                }
+                continue;
+            }
+
+            foreach ((array) glob($base . '/' . $pattern, GLOB_NOSORT) as $path) {
+                $real = realpath($path);
+                // Double check: a symlink could point outside the destination.
+                if ($real === false || strpos($real, $base . '/') !== 0) {
+                    continue;
+                }
+                is_dir($real) && !is_link($real)
+                    ? $filesystem->removeDirectory($real)
+                    : $filesystem->unlink($real);
+                $removed[] = substr($real, strlen($base) + 1);
+            }
+        }
+
+        return $removed;
     }
 
     /**
