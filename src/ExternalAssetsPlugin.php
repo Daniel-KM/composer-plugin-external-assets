@@ -241,7 +241,8 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
             ]);
             curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-            curl_close($ch);
+            // curl_close() is useless here since 7.2, has no effect since php 8.0,
+            // and is deprecated since php 8.5.
             return $status;
         }
 
