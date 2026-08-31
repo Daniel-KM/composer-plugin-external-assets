@@ -73,6 +73,37 @@ Rules:
 3. **Directory + file** (trailing `/` + non-archive URL): Copies the file into
    the directory, keeping its original name.
 
+### Excluding files from an archive
+
+An archive often ships files that should not be published: a demo page, source
+maps, tests. Instead of the URL, use an object with the keys `url` and
+`exclude`:
+
+```json
+{
+    "extra": {
+        "external-assets": {
+            "asset/vendor/cookiebar/": {
+                "url": "https://example.com/jquery.cookiebar.zip",
+                "exclude": ["index.html", "docs", "*.map"]
+            }
+        }
+    }
+}
+```
+
+Each exclude is a path relative to the destination directory and may hold a
+glob. A directory is removed with its content. A missing path is not an error,
+so the same declaration works whatever the content of the archive.
+
+Excludes are applied after the download, but also when the assets are already
+present: adding one to `composer.json` is enough to remove the file, without
+downloading the whole archive again.
+
+A pattern that would escape the destination, absolute or holding `..`, is
+skipped with a warning: an asset declaration must never remove a file outside
+of its own directory.
+
 ### Complete example
 
 ```json
