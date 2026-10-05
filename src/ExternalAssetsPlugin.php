@@ -179,19 +179,6 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
                 continue;
             }
 
-            if ($exists) {
-                if ($isDirectory) {
-                    foreach (array_diff(scandir($destPath), ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html']) as $entry) {
-                        $path = $destPath . '/' . $entry;
-                        is_dir($path) ? $filesystem->removeDirectory($path) : $filesystem->unlink($path);
-                    }
-                } else {
-                    $filesystem->unlink($destPath);
-                }
-            }
-
-            $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
-
             // Fetch the url with a native request to avoid the full stack trace
             // displayed by composer when an asset is missing.
             // Because the check does not share composer config (proxy/auth/CA
@@ -208,6 +195,19 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
                 ));
                 continue;
             }
+
+            if ($exists) {
+                if ($isDirectory) {
+                    foreach (array_diff(scandir($destPath), ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html']) as $entry) {
+                        $path = $destPath . '/' . $entry;
+                        is_dir($path) ? $filesystem->removeDirectory($path) : $filesystem->unlink($path);
+                    }
+                } else {
+                    $filesystem->unlink($destPath);
+                }
+            }
+
+            $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
 
             $this->io->write(sprintf(
                 '<info>Downloading asset %s for %s...</info>',
