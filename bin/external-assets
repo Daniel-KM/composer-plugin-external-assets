@@ -175,30 +175,20 @@ foreach ($paths as $path) {
             }
             if ($exists && $urlChanged) {
                 $logger->info("  URL changed for $destination, re-downloading");
-                if ($isDirectory) {
-                    removeDirectory($destPath);
-                } else {
-                    @unlink($destPath);
-                }
-            }
-        } else {
-            // Force mode: remove existing assets
-            if ($isDirectory && is_dir($destPath)) {
-                $logger->info("  Removing $destination for re-download");
-                removeDirectory($destPath);
-            } elseif (file_exists($destPath)) {
-                $logger->info("  Removing $destination for re-download");
-                unlink($destPath);
             }
         }
+
+        // The assets in place are replaced only once the new ones are
+        // downloaded, so a failed download cannot empty the destination.
+        $clearPath = $isDirectory && is_dir($destPath) ? $destPath : null;
 
         $logger->info("  Downloading " . basename($url) . " -> $destination");
 
         try {
             if ($isDirectory && $isArchive) {
-                downloadAndExtract($url, $destPath);
+                downloadAndExtract($url, $destPath, $clearPath);
             } elseif ($isDirectory) {
-                downloadFile($url, $destPath . basename($url));
+                downloadFile($url, $destPath . basename($url), $clearPath);
             } else {
                 downloadFile($url, $destPath);
             }
@@ -231,7 +221,7 @@ exit($totalFailed > 0 ? 1 : 0);
 
 // Helper functions
 
-function downloadFile(string $url, string $destPath): void
+function downloadFile(string $url, string $destPath, ?string $clearPath = null): void
 {
     $destDir = dirname($destPath);
     if (!is_dir($destDir)) {
@@ -239,10 +229,29 @@ function downloadFile(string $url, string $destPath): void
     }
 
     $content = fetchUrl($url);
+
+    if ($clearPath !== null) {
+        clearDirectory($clearPath);
+    }
     file_put_contents($destPath, $content);
 }
 
-function downloadAndExtract(string $url, string $destPath): void
+/**
+ * Remove the content of a directory, except the files of the package.
+ */
+function clearDirectory(string $destPath): void
+{
+    if (!is_dir($destPath)) {
+        return;
+    }
+    $kept = ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html'];
+    foreach (array_diff(scandir($destPath), $kept) as $entry) {
+        $path = $destPath . '/' . $entry;
+        is_dir($path) ? removeDirectory($path) : @unlink($path);
+    }
+}
+
+function downloadAndExtract(string $url, string $destPath, ?string $clearPath = null): void
 {
     $tempFile = sys_get_temp_dir() . '/' . basename($url);
     $tempDir = sys_get_temp_dir() . '/external_extract_' . uniqid();
@@ -263,6 +272,11 @@ function downloadAndExtract(string $url, string $destPath): void
 
         // Check if archive has a single root directory and strip it
         $sourceDir = getArchiveSourceDir($tempDir);
+
+        // The archive is extracted, so the assets in place can be replaced.
+        if ($clearPath !== null) {
+            clearDirectory($clearPath);
+        }
 
         // Move contents to destination
         if (!is_dir($destPath)) {

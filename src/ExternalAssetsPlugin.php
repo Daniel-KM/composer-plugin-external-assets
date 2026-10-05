@@ -47,6 +47,13 @@ use Composer\Util\ProcessExecutor;
  */
 class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
 {
+    /**
+     * Files kept in a destination directory: they belong to the package, not
+     * to the asset, so they don't make the directory a filled one and they are
+     * not removed when the assets are replaced.
+     */
+    const KEPT_FILES = ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html'];
+
     /** @var Composer */
     protected $composer;
 
@@ -164,10 +171,7 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
             $destPath = $basePath . '/' . ltrim($destination, '/');
             $isDirectory = substr($destination, -1) === '/';
             $exists = $isDirectory
-                ? (is_dir($destPath) && count(array_diff(
-                    scandir($destPath),
-                    ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html']
-                )) > 0)
+                ? (is_dir($destPath) && count(array_diff(scandir($destPath), self::KEPT_FILES)) > 0)
                 : file_exists($destPath);
             $urlChanged = ($manifest[$destination] ?? null) !== $url;
 
@@ -179,8 +183,10 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
                 continue;
             }
 
-            // Fetch the url with a native request to avoid the full stack trace
-            // displayed by composer when an asset is missing.
+            // Fetch the url with a native request to avoid the full stack
+            // trace displayed by composer when an asset is missing. This is
+            // only about the output: the assets in place are kept whatever the
+            // error, because they are replaced only after the download.
             // Because the check does not share composer config (proxy/auth/CA
             // set only in composer.json, not in env), an non-404/403/410 error
             // go back to normal composer download.
@@ -196,16 +202,9 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
                 continue;
             }
 
-            if ($exists) {
-                if ($isDirectory) {
-                    foreach (array_diff(scandir($destPath), ['.', '..', '.htaccess', '.gitkeep', '.gitignore', 'index.html']) as $entry) {
-                        $path = $destPath . '/' . $entry;
-                        is_dir($path) ? $filesystem->removeDirectory($path) : $filesystem->unlink($path);
-                    }
-                } else {
-                    $filesystem->unlink($destPath);
-                }
-            }
+            // The assets in place are replaced only once the new ones are
+            // downloaded, so a failed download cannot empty the destination.
+            $clearPath = $exists && $isDirectory ? $destPath : null;
 
             $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
 
@@ -217,9 +216,9 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
 
             try {
                 if ($isDirectory && $isArchive) {
-                    $this->downloadAndExtract($url, $destPath);
+                    $this->downloadAndExtract($url, $destPath, $clearPath);
                 } elseif ($isDirectory) {
-                    $this->downloadFile($url, $destPath . basename($url));
+                    $this->downloadFile($url, $destPath . basename($url), $clearPath);
                 } else {
                     $this->downloadFile($url, $destPath);
                 }
@@ -294,13 +293,39 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
     /**
      * Download a single file using composer HttpDownloader.
      */
-    protected function downloadFile(string $url, string $destPath): void
+    protected function downloadFile(string $url, string $destPath, ?string $clearPath = null): void
     {
         $filesystem = new Filesystem();
         $filesystem->ensureDirectoryExists(dirname($destPath));
 
+        // Download aside, so a failed or partial download doesn't truncate the
+        // file in place.
+        $tempFile = sys_get_temp_dir() . '/external_asset_' . uniqid();
+
         $httpDownloader = new HttpDownloader($this->io, $this->composer->getConfig());
-        $httpDownloader->copy($url, $destPath);
+        $httpDownloader->copy($url, $tempFile);
+
+        if ($clearPath !== null) {
+            $this->clearDirectory($clearPath, $filesystem);
+        }
+        if (file_exists($destPath)) {
+            $filesystem->unlink($destPath);
+        }
+        $filesystem->rename($tempFile, $destPath);
+    }
+
+    /**
+     * Remove the content of a directory, except the files of the package.
+     */
+    protected function clearDirectory(string $destPath, Filesystem $filesystem): void
+    {
+        if (!is_dir($destPath)) {
+            return;
+        }
+        foreach (array_diff(scandir($destPath), self::KEPT_FILES) as $entry) {
+            $path = $destPath . '/' . $entry;
+            is_dir($path) ? $filesystem->removeDirectory($path) : $filesystem->unlink($path);
+        }
     }
 
     /**
@@ -399,7 +424,7 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
      * If the archive contains a single root directory, its contents are
      * extracted directly to the destination (stripping the root directory).
      */
-    protected function downloadAndExtract(string $url, string $destPath): void
+    protected function downloadAndExtract(string $url, string $destPath, ?string $clearPath = null): void
     {
         $filesystem = new Filesystem();
 
@@ -446,6 +471,11 @@ class ExternalAssetsPlugin implements PluginInterface, EventSubscriberInterface
 
         // Check if archive has a single root directory and strip it.
         $sourceDir = $this->getArchiveSourceDir($tempDir);
+
+        // The archive is extracted, so the assets in place can be replaced.
+        if ($clearPath !== null) {
+            $this->clearDirectory($clearPath, $filesystem);
+        }
 
         // Move contents to destination.
         $filesystem->ensureDirectoryExists($destPath);
