@@ -131,7 +131,8 @@ of its own directory.
 ### Cli tool for manual installations
 
 For packages installed via `git clone`, assets are not downloaded automatically.
-Use the cli tool:
+Use the cli tool. It shares the code of the plugin but uses no composer class,
+so it also runs on a checkout without any `vendor/` directory:
 
 ```sh
 # From project root directory
@@ -184,6 +185,15 @@ The plugin subscribes to four composer events:
 For each asset, the plugin downloads the file and either saves it directly,
 extracts it (for archives), or copies it into the target directory.
 
+The assets already installed are replaced only once the new ones are
+downloaded and extracted, so a url that is not reachable any more, a release
+not published yet or a network issue never leaves a destination empty: the
+previous assets stay in place and the error is reported.
+
+These files are never removed with the assets, because they belong to the
+package and not to the asset: `.htaccess`, `.gitkeep`, `.gitignore` and
+`index.html`. A destination holding only them is handled as an empty one.
+
 ### Lock file (`vendor/external-assets.lock.json`)
 
 Since version 1.1, the plugin maintains a `vendor/external-assets.lock.json`
@@ -200,8 +210,9 @@ At every install/update, the plugin compares the URLs declared in
 `composer.json` against the URLs stored in the lock:
 
 - If the asset is present on disk and the URL is unchanged, it is skipped.
-- If the URL changed, the previous content is removed and the asset is
-  re-downloaded.
+- If the URL changed, the asset is re-downloaded, then the previous content is
+  replaced. The lock is updated only on success, so a failed download is
+  retried at the next install or update.
 - If the asset is missing, it is downloaded.
 
 The lock file represents the **local installed state** on a given machine,
@@ -263,6 +274,10 @@ See online issues on the [plugin issues] page on GitLab.
 - Ensure your package requires `sempia/external-assets`
 - Verify URLs are accessible: `curl -I https://your-url.com/file.js`
 - Check that the package directory is writeable
+
+An asset that cannot be downloaded is reported as an error and the install
+goes on with the other assets. The assets already in place are kept, so a
+wrong url does not break a working install.
 
 ### Archive extraction fails
 
