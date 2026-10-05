@@ -4,20 +4,14 @@ declare(strict_types=1);
 
 namespace Sempia\ExternalAssets\Test;
 
-use Composer\Composer;
-use Composer\Config;
-use Composer\Installer\InstallationManager;
-use Composer\IO\IOInterface;
 use Composer\Package\PackageInterface;
-use Sempia\ExternalAssets\ExternalAssetsPlugin;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Mock-based tests for ExternalAssetsPlugin download logic.
+ * Tests of the install logic, without any http request.
  *
- * These tests verify the download and extraction logic without making actual
- * HTTP requests. They use a testable subclass that allows injecting mock
- * download behavior.
+ * The tests use the code of AssetInstaller: only the transport and the output
+ * are replaced, so a change of the decisions is caught.
  */
 class ExternalAssetsDownloadTest extends TestCase
 {
@@ -96,7 +90,7 @@ class ExternalAssetsDownloadTest extends TestCase
 
         $plugin = $this->createTestablePlugin([
             'https://example.com/library-1.0.0.zip' => $zipContent,
-        ], true);
+        ]);
 
         $package = $this->createMockPackage([
             'external-assets' => [
@@ -127,7 +121,7 @@ class ExternalAssetsDownloadTest extends TestCase
 
         $plugin = $this->createTestablePlugin([
             'https://github.com/vendor/library/releases/download/v1.0.0/library.zip' => $zipContent,
-        ], true);
+        ]);
 
         $package = $this->createMockPackage([
             'external-assets' => [
@@ -158,7 +152,7 @@ class ExternalAssetsDownloadTest extends TestCase
 
         $plugin = $this->createTestablePlugin([
             'https://example.com/library.zip' => $zipContent,
-        ], true);
+        ]);
 
         $package = $this->createMockPackage([
             'external-assets' => [
@@ -187,7 +181,7 @@ class ExternalAssetsDownloadTest extends TestCase
 
         $plugin = $this->createTestablePlugin([
             'https://example.com/package.tar.gz' => $tarGzContent,
-        ], true);
+        ]);
 
         $package = $this->createMockPackage([
             'external-assets' => [
@@ -288,6 +282,148 @@ class ExternalAssetsDownloadTest extends TestCase
         $this->assertFileExists($this->installPath . '/asset/vendor/exists.js');
         // Second file should not exist (download failed)
         $this->assertFileDoesNotExist($this->installPath . '/asset/vendor/missing.js');
+    }
+
+    /**
+     * A failed download must not remove the assets already installed.
+     */
+    public function testAssetsKeptWhenDownloadFails(): void
+    {
+        $destPath = $this->installPath . '/asset/vendor/library';
+        mkdir($destPath, 0755, true);
+        file_put_contents($destPath . '/lib.min.js', '// Installed version');
+        file_put_contents($destPath . '/.htaccess', 'Deny from all');
+
+        // The url is not in the map, so the download throws.
+        $plugin = $this->createTestablePlugin([]);
+        $package = $this->createMockPackage([
+            'external-assets' => [
+                'asset/vendor/library/' => 'https://example.com/library-2.0.0.zip',
+            ],
+        ]);
+
+        $this->assertFalse($plugin->testHandleExternalAssets($package, $this->installPath));
+
+        $this->assertFileExists($destPath . '/lib.min.js');
+        $this->assertEquals('// Installed version', file_get_contents($destPath . '/lib.min.js'));
+        $this->assertFileExists($destPath . '/.htaccess');
+    }
+
+    /**
+     * An asset missing for sure must not remove the assets already installed.
+     */
+    public function testAssetsKeptWhenAssetIsMissing(): void
+    {
+        $destPath = $this->installPath . '/asset/vendor/library';
+        mkdir($destPath, 0755, true);
+        file_put_contents($destPath . '/lib.min.js', '// Installed version');
+
+        $url = 'https://example.com/library-2.0.0.zip';
+        $plugin = $this->createTestablePlugin([], [$url => 404]);
+        $package = $this->createMockPackage([
+            'external-assets' => ['asset/vendor/library/' => $url],
+        ]);
+
+        $this->assertFalse($plugin->testHandleExternalAssets($package, $this->installPath));
+
+        $this->assertFileExists($destPath . '/lib.min.js');
+        $this->assertEquals('// Installed version', file_get_contents($destPath . '/lib.min.js'));
+        $this->assertStringContainsString('HTTP 404', implode("\n", $plugin->messages));
+    }
+
+    /**
+     * A failed download must not truncate a single file already installed.
+     */
+    public function testFileKeptWhenDownloadFails(): void
+    {
+        $destFile = $this->installPath . '/asset/vendor/lib.min.js';
+        mkdir(dirname($destFile), 0755, true);
+        file_put_contents($destFile, '// Installed version');
+
+        $plugin = $this->createTestablePlugin([]);
+        $package = $this->createMockPackage([
+            'external-assets' => [
+                'asset/vendor/lib.min.js' => 'https://example.com/lib-2.0.0.min.js',
+            ],
+        ]);
+
+        $this->assertFalse($plugin->testHandleExternalAssets($package, $this->installPath));
+        $this->assertEquals('// Installed version', file_get_contents($destFile));
+    }
+
+    /**
+     * The previous assets are replaced, but the files of the package are kept.
+     */
+    public function testAssetsReplacedAndKeptFilesPreserved(): void
+    {
+        $destPath = $this->installPath . '/asset/vendor/library';
+        mkdir($destPath . '/old', 0755, true);
+        file_put_contents($destPath . '/removed.js', '// Previous version');
+        file_put_contents($destPath . '/old/nested.js', '// Previous nested');
+        file_put_contents($destPath . '/.htaccess', 'Deny from all');
+
+        $zipContent = $this->createTestZip(['lib.min.js' => '// New version']);
+        $plugin = $this->createTestablePlugin([
+            'https://example.com/library-2.0.0.zip' => $zipContent,
+        ]);
+        $package = $this->createMockPackage([
+            'external-assets' => [
+                'asset/vendor/library/' => 'https://example.com/library-2.0.0.zip',
+            ],
+        ]);
+
+        $this->assertTrue($plugin->testHandleExternalAssets($package, $this->installPath));
+
+        $this->assertFileExists($destPath . '/lib.min.js');
+        $this->assertFileDoesNotExist($destPath . '/removed.js');
+        $this->assertDirectoryDoesNotExist($destPath . '/old');
+        $this->assertFileExists($destPath . '/.htaccess');
+    }
+
+    /**
+     * An asset already installed from the same url is not downloaded again.
+     */
+    public function testUpToDateAssetIsSkipped(): void
+    {
+        $url = 'https://example.com/library-1.0.0.zip';
+        $zipContent = $this->createTestZip(['lib.min.js' => '// Version 1']);
+        $package = $this->createMockPackage([
+            'external-assets' => ['asset/vendor/library/' => $url],
+        ]);
+
+        $plugin = $this->createTestablePlugin([$url => $zipContent]);
+        $this->assertTrue($plugin->testHandleExternalAssets($package, $this->installPath));
+
+        $destFile = $this->installPath . '/asset/vendor/library/lib.min.js';
+        file_put_contents($destFile, '// Edited');
+
+        // The url did not change, so the asset is kept as it is.
+        $plugin = $this->createTestablePlugin([]);
+        $this->assertTrue($plugin->testHandleExternalAssets($package, $this->installPath));
+        $this->assertEquals('// Edited', file_get_contents($destFile));
+    }
+
+    /**
+     * The files of the package are not removed with the assets.
+     */
+    public function testClearDirectoryKeepsPackageFiles(): void
+    {
+        $destPath = $this->installPath . '/asset/vendor/library';
+        mkdir($destPath . '/sub', 0755, true);
+        file_put_contents($destPath . '/asset.js', '// Asset');
+        file_put_contents($destPath . '/sub/nested.js', '// Nested');
+        foreach (['.htaccess', '.gitkeep', '.gitignore', 'index.html'] as $kept) {
+            file_put_contents($destPath . '/' . $kept, 'kept');
+        }
+
+        $plugin = $this->createTestablePlugin([]);
+        $plugin->testClearDirectory($destPath);
+
+        $this->assertFileDoesNotExist($destPath . '/asset.js');
+        $this->assertDirectoryDoesNotExist($destPath . '/sub');
+        foreach (['.htaccess', '.gitkeep', '.gitignore', 'index.html'] as $kept) {
+            $this->assertFileExists($destPath . '/' . $kept);
+        }
     }
 
     /**
@@ -414,21 +550,9 @@ class ExternalAssetsDownloadTest extends TestCase
      * @param array $urlContentMap Map of URL => content for mock downloads
      * @param bool $handleArchives Whether to actually extract archives
      */
-    protected function createTestablePlugin(array $urlContentMap, bool $handleArchives = false): TestableExternalAssetsPlugin
+    protected function createTestablePlugin(array $urlContentMap, array $urlStatusMap = []): TestableAssetInstaller
     {
-        $io = $this->createMock(IOInterface::class);
-        $io->method('write')->willReturn(null);
-        $io->method('writeError')->willReturn(null);
-
-        $config = $this->createMock(Config::class);
-
-        $composer = $this->createMock(Composer::class);
-        $composer->method('getConfig')->willReturn($config);
-
-        $plugin = new TestableExternalAssetsPlugin($urlContentMap, $handleArchives);
-        $plugin->activate($composer, $io);
-
-        return $plugin;
+        return new TestableAssetInstaller($urlContentMap, $urlStatusMap);
     }
 
     /**
@@ -515,181 +639,6 @@ class ExternalAssetsDownloadTest extends TestCase
             $path = $dir . '/' . $entry;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
-            } else {
-                @unlink($path);
-            }
-        }
-        @rmdir($dir);
-    }
-}
-
-/**
- * Testable subclass of ExternalAssetsPlugin that allows mocking downloads.
- */
-class TestableExternalAssetsPlugin extends ExternalAssetsPlugin
-{
-    /** @var array Map of URL => content for mock downloads */
-    protected array $urlContentMap;
-
-    /** @var bool Whether to handle archives */
-    protected bool $handleArchives;
-
-    public function __construct(array $urlContentMap, bool $handleArchives = false)
-    {
-        $this->urlContentMap = $urlContentMap;
-        $this->handleArchives = $handleArchives;
-    }
-
-    /**
-     * Expose handleExternalAssets for testing with custom install path.
-     */
-    public function testHandleExternalAssets(object $package, string $installPath): void
-    {
-        $extra = $package->getExtra();
-        if (empty($extra['external-assets']) || !is_array($extra['external-assets'])) {
-            return;
-        }
-
-        foreach ($extra['external-assets'] as $destination => $url) {
-            $destPath = $installPath . '/' . ltrim($destination, '/');
-            $isDirectory = substr($destination, -1) === '/';
-            $isArchive = preg_match('/\.(zip|tar\.gz|tgz)$/i', $url);
-
-            $this->io->write(sprintf(
-                '<info>Downloading asset %s for %s...</info>',
-                basename($url),
-                $package->getPrettyName()
-            ));
-
-            try {
-                if ($isDirectory && $isArchive && $this->handleArchives) {
-                    $this->testDownloadAndExtract($url, $destPath);
-                } elseif ($isDirectory) {
-                    $this->testDownloadFile($url, $destPath . basename($url));
-                } else {
-                    $this->testDownloadFile($url, $destPath);
-                }
-            } catch (\Exception $e) {
-                $this->io->writeError(sprintf(
-                    '<warning>Failed to download asset %s: %s</warning>',
-                    $url,
-                    $e->getMessage()
-                ));
-            }
-        }
-    }
-
-    /**
-     * Mock download file - uses urlContentMap instead of HTTP.
-     */
-    protected function testDownloadFile(string $url, string $destPath): void
-    {
-        if (!isset($this->urlContentMap[$url])) {
-            throw new \RuntimeException("Mock download failed: URL not in map: $url");
-        }
-
-        $destDir = dirname($destPath);
-        if (!is_dir($destDir)) {
-            mkdir($destDir, 0755, true);
-        }
-
-        file_put_contents($destPath, $this->urlContentMap[$url]);
-    }
-
-    /**
-     * Mock download and extract - uses urlContentMap for archive content.
-     */
-    protected function testDownloadAndExtract(string $url, string $destPath): void
-    {
-        if (!isset($this->urlContentMap[$url])) {
-            throw new \RuntimeException("Mock download failed: URL not in map: $url");
-        }
-
-        $tempFile = sys_get_temp_dir() . '/external_test_' . uniqid() . '_' . basename($url);
-        $tempDir = sys_get_temp_dir() . '/external_extract_test_' . uniqid();
-
-        mkdir($tempDir, 0755, true);
-        file_put_contents($tempFile, $this->urlContentMap[$url]);
-
-        try {
-            if (preg_match('/\.zip$/i', $url)) {
-                $zip = new \ZipArchive();
-                if ($zip->open($tempFile) !== true) {
-                    throw new \RuntimeException('Failed to open zip');
-                }
-                $zip->extractTo($tempDir);
-                $zip->close();
-            } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $url)) {
-                $phar = new \PharData($tempFile);
-                $phar->extractTo($tempDir);
-            }
-
-            @unlink($tempFile);
-
-            $sourceDir = $this->getArchiveSourceDir($tempDir);
-
-            if (!is_dir($destPath)) {
-                mkdir($destPath, 0755, true);
-            }
-
-            $this->testMoveDirectoryContents($sourceDir, $destPath);
-
-            $this->removeDirectoryRecursive($tempDir);
-        } catch (\Exception $e) {
-            @unlink($tempFile);
-            $this->removeDirectoryRecursive($tempDir);
-            throw $e;
-        }
-    }
-
-    /**
-     * Expose getArchiveSourceDir for testing.
-     */
-    public function testGetArchiveSourceDir(string $tempDir): string
-    {
-        return $this->getArchiveSourceDir($tempDir);
-    }
-
-    /**
-     * Expose moveDirectoryContents for testing.
-     */
-    public function testMoveDirectoryContents(string $source, string $dest): void
-    {
-        $entries = array_diff(scandir($source), ['.', '..']);
-
-        foreach ($entries as $entry) {
-            $srcPath = $source . '/' . $entry;
-            $dstPath = $dest . '/' . $entry;
-
-            if (is_dir($srcPath)) {
-                if (!is_dir($dstPath)) {
-                    mkdir($dstPath, 0755, true);
-                }
-                $this->testMoveDirectoryContents($srcPath, $dstPath);
-                @rmdir($srcPath);
-            } else {
-                if (file_exists($dstPath)) {
-                    @unlink($dstPath);
-                }
-                rename($srcPath, $dstPath);
-            }
-        }
-    }
-
-    /**
-     * Helper to remove directory recursively.
-     */
-    protected function removeDirectoryRecursive(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-
-        $entries = array_diff(scandir($dir), ['.', '..']);
-        foreach ($entries as $entry) {
-            $path = $dir . '/' . $entry;
-            if (is_dir($path)) {
-                $this->removeDirectoryRecursive($path);
             } else {
                 @unlink($path);
             }

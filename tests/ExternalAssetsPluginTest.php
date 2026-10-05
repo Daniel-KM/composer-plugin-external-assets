@@ -249,8 +249,7 @@ class ExternalAssetsPluginTest extends TestCase
 
         mkdir($dstDir);
 
-        // Copy the logic from the plugin
-        $this->moveDirectoryContents($srcDir, $dstDir);
+        (new TestableAssetInstaller([]))->testMoveDirectoryContents($srcDir, $dstDir);
 
         // Check files were moved
         $this->assertFileExists($dstDir . '/file1.js');
@@ -368,29 +367,4 @@ class ExternalAssetsPluginTest extends TestCase
         rmdir($tempDir);
     }
 
-    /**
-     * Helper method to move directory contents (mirrors plugin logic).
-     */
-    protected function moveDirectoryContents(string $source, string $dest): void
-    {
-        $entries = array_diff(scandir($source), ['.', '..']);
-
-        foreach ($entries as $entry) {
-            $srcPath = $source . '/' . $entry;
-            $dstPath = $dest . '/' . $entry;
-
-            if (is_dir($srcPath)) {
-                if (!is_dir($dstPath)) {
-                    mkdir($dstPath, 0755, true);
-                }
-                $this->moveDirectoryContents($srcPath, $dstPath);
-                @rmdir($srcPath);
-            } else {
-                if (file_exists($dstPath)) {
-                    @unlink($dstPath);
-                }
-                rename($srcPath, $dstPath);
-            }
-        }
-    }
 }

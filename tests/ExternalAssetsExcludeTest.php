@@ -11,8 +11,8 @@ use Sempia\ExternalAssets\ExternalAssetsPlugin;
  * The methods of the plugin are called directly: a test rewriting their logic
  * would keep passing after the logic changed.
  *
- * @covers \Sempia\ExternalAssets\ExternalAssetsPlugin::normalizeAsset
- * @covers \Sempia\ExternalAssets\ExternalAssetsPlugin::applyExcludes
+ * @covers \Sempia\ExternalAssets\AssetInstaller::normalizeAsset
+ * @covers \Sempia\ExternalAssets\AssetInstaller::applyExcludes
  */
 class ExternalAssetsExcludeTest extends TestCase
 {
